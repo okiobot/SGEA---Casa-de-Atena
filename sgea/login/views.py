@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404, HttpResponse
 from .models import *
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.core.validators import RegexValidator
@@ -9,7 +10,7 @@ from django.db.models import Q
 from django.contrib.auth.hashers import check_password 
 from datetime import date, datetime
 from decimal import Decimal
-from django.core.mail import EmailMessage
+from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.template.loader import render_to_string
 import random
 from .serializers import *
@@ -19,7 +20,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.mixins import CreateModelMixin
 from rest_framework.authtoken.views import ObtainAuthToken
-
+from email.mime.image import MIMEImage 
 
 # Create your views here.
 def home(request):
@@ -215,14 +216,27 @@ def cadastro_usuarios(request):
         novo_usuario.set_password(senha)
         novo_usuario.save()
 
+        logo_path = settings.BASE_DIR / 'login' / 'static' / 'assets' / 'logos' / 'atena_logo.png'
 
         emailhtml = render_to_string('usuarios/confirmacao_cadastro.html', {"usuario" : novo_usuario, "codigo" : codigo})
+
         try:
-            email = EmailMessage(subject=f"Confirmação de cadastro: {novo_usuario.nome} {novo_usuario.sobrenome}", 
+            email = EmailMultiAlternatives(subject=f"Confirmação de cadastro: {novo_usuario.nome} {novo_usuario.sobrenome}", 
                                 body= emailhtml, from_email="casa.de.atenaa@gmail.com", to=[novo_usuario.email])
             email.content_subtype = 'html'
+
+            with open(logo_path, 'rb') as f:
+                logo_data = f.read()
+            
+            logo = MIMEImage(logo_data)
+            logo.add_header('Content-ID', '<logo_cid>')
+            logo.add_header('Content-Disposition', 'inline')
+            email.attach(logo)
+            
+            email.attach_alternative(emailhtml, "text/html")
+            
             email.send()
-        
+            
         except Exception:
             print("Erro ao enviar confirmação pelo email")
         
